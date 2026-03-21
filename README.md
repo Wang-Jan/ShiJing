@@ -1,11 +1,19 @@
-<div align="center">
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+# 视净 (Shi Jing) - 桌面清洁助手
 
-  <h1>Built with AI Studio</h2>
+基于 AI 的智能桌面监控与机器人协作管理系统。
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 🌟 核心特性
+- **双端自适应**: 专为手机端交互设计，完美适配深色/浅色模式。
+- **AI 诊断**: 集成桌面脏污识别与物品摆放优化建议。
+- **实时监控**: 实时查看桌面状态。
+- **机器人控制**: 远程下发清理与归位指令。
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## 🛠️ 开发指南
+- **安装依赖**: `npm install`
+- **开发环境**: `npm run dev`
+- **构建指令**: `npm run build`
 
-</div>
+## 🚀 部署说明
+本项目已针对云端环境优化，支持 PWA 特性。
+
