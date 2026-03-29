@@ -5,8 +5,8 @@ const config: CapacitorConfig = {
   appName: '视净',
   webDir: 'dist',
   server: {
-    url: 'https://你的线上域名',
-    cleartext: false
+    url: 'http://121.41.65.197:3000/#/login',
+    cleartext: true
   }
 };
 
