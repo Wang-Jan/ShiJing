@@ -151,7 +151,20 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    localStorage.setItem('insights', JSON.stringify(insights));
+    try {
+      // 限制最多存储100条记录，避免无限增长撑爆localStorage
+      const maxSaveCount = 100;
+      const limitedData = Array.isArray(insightsData) ? insightsData.slice(0, maxSaveCount) : insightsData;
+      localStorage.setItem('insights', JSON.stringify(limitedData));
+    } catch (error) {
+      console.warn('本地存储写入失败，已清空历史数据:', error);
+      // 写入失败时，直接清空对应存储，避免页面持续崩溃
+      try {
+        localStorage.removeItem('insights');
+      } catch (clearErr) {
+        console.error('清空存储失败:', clearErr);
+      }
+    }
   }, [insights]);
 
   useEffect(() => {

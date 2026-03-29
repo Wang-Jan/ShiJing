@@ -340,6 +340,30 @@ const registerRoutes = (app: express.Express, pool: Pool) => {
       return res.status(502).json({ message: 'Garden 分析失败，请稍后重试' });
     }
   });
+
+  app.get('/api/test-garden', async (req, res) => {
+    try {
+      const testUrl = process.env.GARDEN_API_BASE_URL + '/v1/models';
+      console.log('正在测试访问:', testUrl);
+      
+      const response = await fetch(testUrl, {
+        headers: {
+          'Authorization': `Bearer ${process.env.GARDEN_API_KEY}`
+        }
+      });
+      
+      const data = await response.json();
+      console.log('测试成功:', data);
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error('测试失败:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+  });
 };
 
 async function startServer() {
