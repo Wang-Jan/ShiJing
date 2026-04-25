@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { User, Lock, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AuthUser } from '../types';
+import { useToast } from '../src/toast';
 
 interface LoginViewProps {
   onLogin: (user: AuthUser, token: string) => void;
@@ -15,6 +16,7 @@ interface LoginLocationState {
 const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const toast = useToast();
   const [accountId, setAccountId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -121,7 +123,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             <button
               type="button"
               className="text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline"
-              onClick={() => alert('忘记密码功能暂未开放，请前往“设置 - 隐私与安全”修改密码。')}
+              onClick={() => toast.info('忘记密码说明', '当前版本请在登录后前往“设置 - 隐私与安全”修改密码。')}
             >
               忘记密码？
             </button>

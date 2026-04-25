@@ -1,6 +1,6 @@
 # 视净（Shi Jing）
 
-“视净”是一款面向桌面清洁场景的智能分析应用。项目采用 `React + TypeScript + Express + MySQL` 技术栈实现，支持用户注册登录、桌面图片上传分析、结果报告展示、个人资料维护、密码修改和 Garden 模型配置。
+“视净”是一款面向桌面清洁场景的智能分析应用。项目采用 `React + TypeScript + Express + MySQL` 技术栈实现，支持用户注册登录、桌面图片上传分析、实时监控、结果报告展示、清洁任务闭环、个人资料维护和密码修改。
 
 当前项目同时提供：
 
@@ -19,18 +19,21 @@
 - 登录态恢复与退出登录
 - 桌面图片上传与分析
 - 分析结果报告化展示
+- 分析历史持久化与记录删除
+- 电脑摄像头实时监控
+- 监控历史报告与记录删除
+- 清洁任务创建、状态流转、前后对比验证
+- 通知中心与动态记录管理
 - 首页最新动态展示
 - 个人资料修改
 - 密码修改
-- Garden API Key 与 Base URL 配置
 - Android APK 打包
 
 当前版本暂未实现：
 
-- 摄像头实时接入
 - 机器人真实控制
-- 分析记录正式入库
-- 多设备协同
+- 多设备云端协同
+- 移动端 APK 专项体验打磨
 
 ---
 
@@ -238,7 +241,7 @@ npm run reset-password -- 9445349 Pass123!
 
 项目当前支持两层 Garden 配置来源。
 
-### 7.1 服务端默认配置
+### 7.1 服务端配置
 
 来源：
 
@@ -247,40 +250,9 @@ npm run reset-password -- 9445349 Pass123!
 
 作用：
 
-- 作为后端调用 Garden 的默认配置
-- 当前端没有提供本地覆盖值时，后端使用这里的配置
-
-### 7.2 设置页本地覆盖配置
-
-来源：
-
-- `设置 -> Garden 模型配置`
-
-可填写：
-
-- API Key
-- Base URL
-
-作用：
-
-- 仅保存在当前浏览器设备的 `localStorage`
-- 分析请求 `/api/analyze` 时会优先通过请求头提交给后端
-- 后端优先使用请求头提供的值
-
-支持的请求头如下：
-
-```http
-X-Garden-Api-Key: <api_key>
-X-Garden-Base-Url: <base_url>
-```
-
-### 7.3 恢复默认
-
-点击 `设置 -> Garden 模型配置 -> 恢复默认` 后：
-
-- 清空当前设备保存的 API Key
-- 清空当前设备保存的 Base URL
-- 后端重新回退使用 `.env` 中的默认配置
+- 作为后端调用 Garden 的唯一运行配置
+- 前端不再保存或提交模型密钥
+- 设置页只展示模型服务状态，不提供用户侧密钥覆盖入口
 
 ---
 
@@ -296,8 +268,10 @@ POST /api/analyze
 
 1. 校验登录 token
 2. 读取图片数据
-3. 优先读取请求头中的 Garden 覆盖配置
-4. 若无覆盖值，则回退到 `.env`
+3. 从后端 `.env` 读取 Garden 服务配置
+4. 调用 Garden 生成结构化分析结果
+5. 将分析结果写入 MySQL
+6. 根据评分阈值自动生成清洁任务
 5. 调用 Garden 模型服务
 6. 返回结构化分析结果
 
@@ -323,32 +297,33 @@ npm run build
 
 ### 10.1 当前打包模式
 
-项目当前 `capacitor.config.ts` 中使用了：
+项目当前采用 **本地资源模式**：
 
 - `webDir: 'dist'`
-- `server.url`
+- 不配置 `server.url`
+- APK 内置前端构建产物
+- 前端通过 `VITE_API_BASE_URL` 请求远程 Node 后端
 
-也就是说，当前 APK 打开后优先加载 `server.url` 指向的网页地址，而不是只依赖本地静态文件。
+这意味着：
+
+- APK 断网时仍可打开应用壳、登录缓存页面和部分本地缓存内容
+- 登录校验、Garden 分析、监控同步、MySQL 数据保存仍需要访问后端服务
+- 修改前端页面后，需要重新执行 `npm run build`、`npx cap sync android` 并重新打包 APK
 
 当前配置示例：
 
 ```ts
-server: {
-  url: 'http://121.41.65.197:3000/#/login',
-  cleartext: true
-}
+const config: CapacitorConfig = {
+  appId: 'com.shijing.app',
+  appName: '视净',
+  webDir: 'dist',
+  server: {
+    cleartext: true
+  }
+};
 ```
 
-这意味着：
-
-- APK 能否正常运行，依赖该地址可访问
-- 该地址对应的 Node 服务、MySQL 和 Garden 服务需要保持可用
-- 如果修改了线上页面但未重新部署，APK 仍可能看到旧内容
-
-如果后续要改为 HTTPS 地址，需同时调整：
-
-- `server.url`
-- `cleartext`
+如后端使用 HTTPS，建议将 `VITE_API_BASE_URL` 改为 HTTPS 地址，并关闭不必要的明文 HTTP 访问。
 
 ---
 
@@ -414,16 +389,27 @@ npm install
 - `appId`
 - `appName`
 - `webDir`
-- `server.url`
 - `cleartext`
 
-### 12.3 构建前端资源
+当前版本不应配置 `server.url`。如果配置了 `server.url`，APK 会重新变成远程网页加载模式，断网时将无法正常打开应用页面。
+
+### 12.3 配置 APK 后端地址
+
+APK 本地资源模式下，前端页面已经内置在安装包中，但接口仍需访问远程后端。打包前需要在 `.env` 中配置：
+
+```bash
+VITE_API_BASE_URL=http://你的服务器IP或域名:3000
+```
+
+本地 Web 开发时可以不填该变量，前端会默认请求同源 `/api`。
+
+### 12.4 构建前端资源
 
 ```bash
 npm run build
 ```
 
-### 12.4 同步到 Android 原生工程
+### 12.5 同步到 Android 原生工程
 
 ```bash
 npx cap sync android
@@ -431,13 +417,13 @@ npx cap sync android
 
 此命令会将最新的前端构建结果和 Capacitor 配置同步到 `android/` 工程中。
 
-### 12.5 打开 Android Studio 工程
+### 12.6 打开 Android Studio 工程
 
 ```bash
 npx cap open android
 ```
 
-### 12.6 在 Android Studio 中生成 APK
+### 12.7 在 Android Studio 中生成 APK
 
 打开 Android Studio 后，可按以下路径操作：
 
@@ -521,9 +507,10 @@ npx cap open android
 
 例如修改：
 
-- `server.url`
 - `appName`
 - `appId`
+- `cleartext`
+- `webDir`
 
 同样需要执行：
 
@@ -533,13 +520,16 @@ npx cap sync android
 
 然后重新生成 APK。
 
-### 14.3 如果 APK 使用的是远程 `server.url`
+### 14.3 如果修改的是后端地址
 
-需要注意：
+如果修改 `.env` 中的 `VITE_API_BASE_URL`，需要重新构建前端并同步 Android 工程：
 
-- APK 显示内容依赖线上网页
-- 仅重新打包 APK 不能替代线上页面部署
-- 如需让 APK 看到最新页面，必须先更新线上服务内容
+```bash
+npm run build
+npx cap sync android
+```
+
+然后重新生成 APK。该变量会被打进前端构建产物中。
 
 ---
 
@@ -660,9 +650,21 @@ npx cap open android
 
 - 是否执行了 `npm run build`
 - 是否执行了 `npx cap sync android`
-- 如果使用了 `server.url`，线上页面是否已同步更新
+- 是否重新在 Android Studio 中生成并安装了新 APK
+- `.env` 中的 `VITE_API_BASE_URL` 是否在构建前已经填写正确
 
-### 17.5 Android Studio 无法生成 APK
+### 17.5 APK 断网时无法使用分析功能
+
+当前 APK 已内置前端资源，断网时可以打开应用页面和部分缓存内容。但以下能力仍然需要联网：
+
+- 登录与会话校验
+- Garden 图片分析
+- 监控结果同步
+- MySQL 数据保存和读取
+
+如果需要完全离线分析，需要在 Android 端额外集成本地数据库和端侧模型，这已经不属于当前 Web + Express + Garden 服务化架构范围。
+
+### 17.6 Android Studio 无法生成 APK
 
 检查：
 
@@ -680,9 +682,10 @@ npx cap open android
 - 前端使用 `HashRouter`
 - 登录后从后端获取签名 token，并通过 `/api/session` 恢复会话
 - 图片分析通过后端 `/api/analyze` 调用 Garden 模型服务
-- 设置页支持本地覆盖 Garden 的 API Key 和 Base URL
-- 用户数据保存于 MySQL
-- Android 安装包通过 Capacitor + Android Studio 生成
+- Garden API Key 与 Base URL 只由后端 `.env` 管理
+- 用户、分析历史、监控会话、通知、动态和清洁任务数据保存于 MySQL
+- Android 安装包通过 Capacitor + Android Studio 生成，并以内置前端资源方式运行
+- APK 中的前端通过 `VITE_API_BASE_URL` 访问远程 Node 后端
 
 ---
 
@@ -703,4 +706,3 @@ npx cap open android
 - APK 安装包
 - 测试账号
 - 运行截图或演示视频
-
