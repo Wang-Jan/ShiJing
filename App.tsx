@@ -1,6 +1,21 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
-import { Bell, Bot, Camera, Home, Moon, Settings, Sparkles, Sun, User as UserIcon } from 'lucide-react';
+import {
+  ArrowRight,
+  Bell,
+  Bot,
+  Camera,
+  Home,
+  Lock,
+  LogIn,
+  Moon,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  Sun,
+  User as UserIcon,
+  UserPlus,
+} from 'lucide-react';
 import { AuthUser, Insight, MonitorEvent, MonitorFrameAnalysis, MonitorSessionSummary, UserPreferences } from './types';
 import { ToastProvider } from './src/toast';
 import { ConfirmProvider } from './src/confirm';
@@ -159,9 +174,178 @@ const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, user, unreadNoti
 const PageLoader = () => (
   <div className="flex min-h-[55vh] flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
     <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-blue-500 dark:border-slate-800" />
-    <p className="text-xs font-bold uppercase tracking-[0.18em]">Loading View</p>
+    <p className="text-xs font-bold uppercase tracking-[0.18em]">正在加载页面</p>
   </div>
 );
+
+const StartupSplash: React.FC<{ status: string }> = ({ status }) => (
+  <div className="fixed inset-0 z-[200] flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 text-white">
+    <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+    <div className="absolute -bottom-24 -left-20 h-72 w-72 rounded-full bg-emerald-400/10 blur-3xl" />
+    <div className="relative flex flex-col items-center px-8 text-center">
+      <div className="relative flex h-24 w-24 items-center justify-center rounded-[2rem] border border-white/10 bg-white/10 shadow-2xl shadow-blue-950/40 backdrop-blur">
+        <div className="absolute inset-3 animate-ping rounded-[1.5rem] border border-blue-300/30" />
+        <Sparkles size={40} className="text-blue-200" />
+      </div>
+      <h1 className="mt-7 text-4xl font-black tracking-tight">视净</h1>
+      <p className="mt-2 text-sm font-bold tracking-[0.18em] text-blue-100">智能桌面清洁助手</p>
+      <div className="mt-8 h-1.5 w-48 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full w-1/2 animate-[shijing-splash_1.1s_ease-in-out_infinite] rounded-full bg-blue-300" />
+      </div>
+      <p className="mt-4 text-xs font-bold text-slate-400">{status}</p>
+    </div>
+  </div>
+);
+
+const GuestHome = () => {
+  const navigate = useNavigate();
+
+  return (
+    <div className="space-y-6 p-4 pb-24">
+      <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-950 p-6 text-white shadow-2xl shadow-slate-200 dark:shadow-none">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="absolute -bottom-20 -left-16 h-52 w-52 rounded-full bg-emerald-400/10 blur-3xl" />
+        <div className="relative">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-blue-100">
+            <ShieldCheck size={13} />
+            访客模式
+          </div>
+          <h2 className="mt-5 text-3xl font-black tracking-tight">先进入视净，再登录使用核心功能</h2>
+          <p className="mt-3 text-sm leading-relaxed text-slate-300">
+            你可以先浏览应用结构和能力说明。图片分析、实时监控、历史记录、任务中心和通知同步需要登录账号后使用。
+          </p>
+          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => navigate('/settings')}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-4 text-sm font-black text-slate-950 active:scale-[0.98]"
+            >
+              去设置页登录
+              <ArrowRight size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/register')}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-sm font-black text-white active:scale-[0.98]"
+            >
+              注册新账号
+              <UserPlus size={16} />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {[
+          { icon: Sparkles, title: 'Garden 图片诊断', desc: '登录后上传桌面图片，生成评分、问题摘要和整理建议。' },
+          { icon: Camera, title: '实时监控', desc: '登录后使用电脑或手机摄像头创建监控会话并归档历史。' },
+          { icon: Bot, title: '清洁任务闭环', desc: '将低分分析转化为任务，并上传整理后图片做前后验证。' },
+          { icon: Bell, title: '通知与动态', desc: '登录后同步未读通知、动态流和所有历史记录。' },
+        ].map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <button
+              key={item.title}
+              type="button"
+              onClick={() => navigate('/settings')}
+              className="rounded-3xl border border-slate-100 bg-white p-5 text-left shadow-sm active:scale-[0.98] dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-200">
+                <Icon size={20} />
+              </div>
+              <h3 className="mt-4 text-base font-black text-slate-900 dark:text-slate-100">{item.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{item.desc}</p>
+            </button>
+          );
+        })}
+      </section>
+    </div>
+  );
+};
+
+const LoginRequiredScreen: React.FC<{ title: string; description?: string }> = ({ title, description }) => {
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex min-h-[70vh] items-center justify-center p-4">
+      <section className="w-full max-w-md rounded-[2.25rem] border border-slate-100 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-200">
+          <Lock size={28} />
+        </div>
+        <h2 className="mt-5 text-2xl font-black text-slate-900 dark:text-slate-100">{title}</h2>
+        <p className="mt-3 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+          {description ?? '该功能需要读取你的账号数据和历史记录。请先前往设置页登录账号，再继续使用。'}
+        </p>
+        <div className="mt-6 grid grid-cols-1 gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/settings')}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-black text-white active:scale-[0.98]"
+          >
+            去设置页登录
+            <ArrowRight size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="rounded-2xl bg-slate-100 px-5 py-4 text-sm font-black text-slate-600 active:scale-[0.98] dark:bg-slate-800 dark:text-slate-200"
+          >
+            返回首页
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+};
+
+const GuestSettings = () => {
+  const navigate = useNavigate();
+
+  return (
+    <div className="space-y-6 p-4 pb-24">
+      <div className="px-1">
+        <h2 className="text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100">设置</h2>
+        <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-500">账号登录与系统入口</p>
+      </div>
+
+      <section className="overflow-hidden rounded-[2.5rem] bg-slate-950 p-6 text-white shadow-2xl shadow-slate-200 dark:shadow-none">
+        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/10 text-blue-100">
+          <LogIn size={30} />
+        </div>
+        <h3 className="mt-5 text-2xl font-black">登录后解锁完整能力</h3>
+        <p className="mt-3 text-sm leading-relaxed text-slate-300">
+          登录后可使用 Garden 分析、实时监控、历史记录、清洁任务、通知中心和个人资料同步。
+        </p>
+        <div className="mt-6 grid grid-cols-1 gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/login', { state: { returnTo: '/' } })}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-4 text-sm font-black text-slate-950 active:scale-[0.98]"
+          >
+            登录账号
+            <ArrowRight size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/register')}
+            className="flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-sm font-black text-white active:scale-[0.98]"
+          >
+            注册账号
+            <UserPlus size={16} />
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-[2rem] border border-slate-100 bg-white p-5 text-sm leading-relaxed text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+        <h3 className="text-base font-black text-slate-900 dark:text-slate-100">访客模式说明</h3>
+        <p className="mt-2">
+          未登录时应用可以正常启动和浏览基础介绍；涉及账号、数据库、Garden 推理和历史数据的操作会提示先登录。
+        </p>
+      </section>
+    </div>
+  );
+};
 
 const buildMonitorInsight = (event: MonitorEvent): Insight => ({
   id: `monitor-${event.id}`,
@@ -203,6 +387,7 @@ const App: React.FC = () => {
   );
   const [insights, setInsights] = useState<Insight[]>(() => readStoredJson<Insight[]>('insights', []));
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     const updateOnlineState = () => setIsOnline(navigator.onLine);
@@ -214,6 +399,11 @@ const App: React.FC = () => {
       window.removeEventListener('online', updateOnlineState);
       window.removeEventListener('offline', updateOnlineState);
     };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSplashDone(true), 1200);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -462,12 +652,8 @@ const App: React.FC = () => {
 
   const toggleTheme = () => setIsDark((value) => !value);
 
-  if (!authReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500 dark:bg-slate-950 dark:text-slate-400">
-        正在验证登录状态...
-      </div>
-    );
+  if (!authReady || !splashDone) {
+    return <StartupSplash status={authReady ? '正在启动应用...' : '正在恢复会话...'} />;
   }
 
   return (
@@ -498,7 +684,7 @@ const App: React.FC = () => {
                       onUnreadCountChange={setUnreadNotificationCount}
                     />
                   ) : (
-                    <Navigate to="/login" replace />
+                    <GuestHome />
                   )
                 }
               />
@@ -516,13 +702,19 @@ const App: React.FC = () => {
                       onMonitorFrame={handleMonitorFrame}
                     />
                   ) : (
-                    <Navigate to="/login" replace />
+                    <LoginRequiredScreen title="实时监控需要登录" />
                   )
                 }
               />
               <Route
                 path="/monitor-history"
-                element={user && authToken ? <MonitorHistoryView authToken={authToken} /> : <Navigate to="/login" replace />}
+                element={
+                  user && authToken ? (
+                    <MonitorHistoryView authToken={authToken} />
+                  ) : (
+                    <LoginRequiredScreen title="监控历史需要登录" />
+                  )
+                }
               />
               <Route
                 path="/ai"
@@ -534,13 +726,19 @@ const App: React.FC = () => {
                       setInsights={setInsights}
                     />
                   ) : (
-                    <Navigate to="/login" replace />
+                    <LoginRequiredScreen title="Garden 图片分析需要登录" />
                   )
                 }
               />
               <Route
                 path="/analysis-history"
-                element={user && authToken ? <AnalysisHistoryView authToken={authToken} /> : <Navigate to="/login" replace />}
+                element={
+                  user && authToken ? (
+                    <AnalysisHistoryView authToken={authToken} />
+                  ) : (
+                    <LoginRequiredScreen title="分析历史需要登录" />
+                  )
+                }
               />
               <Route
                 path="/robot"
@@ -548,7 +746,7 @@ const App: React.FC = () => {
                   user && authToken ? (
                     <RobotView authToken={authToken} />
                   ) : (
-                    <Navigate to="/login" replace />
+                    <LoginRequiredScreen title="清洁任务需要登录" />
                   )
                 }
               />
@@ -565,13 +763,19 @@ const App: React.FC = () => {
                       onUserUpdate={handleUserUpdate}
                     />
                   ) : (
-                    <Navigate to="/login" replace />
+                    <GuestSettings />
                   )
                 }
               />
               <Route
                 path="/all-activities"
-                element={user && authToken ? <AllActivitiesView authToken={authToken} /> : <Navigate to="/login" replace />}
+                element={
+                  user && authToken ? (
+                    <AllActivitiesView authToken={authToken} />
+                  ) : (
+                    <LoginRequiredScreen title="全部动态需要登录" />
+                  )
+                }
               />
               <Route
                 path="/notifications"
@@ -579,7 +783,7 @@ const App: React.FC = () => {
                   user && authToken ? (
                     <NotificationsView authToken={authToken} onUnreadCountChange={setUnreadNotificationCount} />
                   ) : (
-                    <Navigate to="/login" replace />
+                    <LoginRequiredScreen title="通知中心需要登录" />
                   )
                 }
               />
