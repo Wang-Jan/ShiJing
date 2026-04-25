@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
-  Camera,
   Clock3,
   Download,
+  ImagePlus,
   Loader2,
   Pause,
   Play,
@@ -54,6 +54,7 @@ const LiveView: React.FC<LiveViewProps> = ({
   const toast = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cameraCaptureInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const captureLockRef = useRef(false);
   const runningRef = useRef(false);
@@ -70,6 +71,7 @@ const LiveView: React.FC<LiveViewProps> = ({
   const [isSubmittingFrame, setIsSubmittingFrame] = useState(false);
   const [liveError, setLiveError] = useState<string | null>(null);
   const [lastCaptureAt, setLastCaptureAt] = useState<string | null>(null);
+  const [manualSnapshot, setManualSnapshot] = useState<string | null>(null);
 
   const latestEvent = monitorEvents[0] ?? null;
   const latestScore = monitorSession?.latestScore ?? null;
@@ -91,6 +93,11 @@ const LiveView: React.FC<LiveViewProps> = ({
   };
 
   const enumerateCameras = async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setCameras([]);
+      return;
+    }
+
     const devices = await navigator.mediaDevices.enumerateDevices();
     const videoInputs = devices.filter((device) => device.kind === 'videoinput');
     setCameras(videoInputs);
@@ -111,7 +118,9 @@ const LiveView: React.FC<LiveViewProps> = ({
 
   const startPreview = async (cameraId?: string) => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error('当前浏览器不支持摄像头访问');
+      setPermissionState('denied');
+      const secureHint = window.isSecureContext ? '' : '当前 WebView 不是安全上下文，请安装同步后的新版 APK。';
+      throw new Error(`当前 WebView 暂不支持实时摄像头预览。${secureHint}可使用“手机拍照”继续提交监控画面。`);
     }
 
     setIsCameraLoading(true);
@@ -137,6 +146,7 @@ const LiveView: React.FC<LiveViewProps> = ({
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
+      setManualSnapshot(null);
       setPermissionState('granted');
       await attachStream(stream);
       await enumerateCameras();
@@ -212,10 +222,18 @@ const LiveView: React.FC<LiveViewProps> = ({
   };
 
   const getSelectedCameraLabel = () => {
+    if (manualSnapshot) {
+      return '手机拍照画面';
+    }
+
     return cameras.find((item) => item.deviceId === selectedCameraId)?.label || '默认摄像头';
   };
 
   const captureCurrentFrame = () => {
+    if (manualSnapshot) {
+      return manualSnapshot;
+    }
+
     if (!videoRef.current || !canvasRef.current) {
       return null;
     }
@@ -244,8 +262,43 @@ const LiveView: React.FC<LiveViewProps> = ({
     return canvas.toDataURL('image/jpeg', 0.82);
   };
 
-  const postFrameAnalysis = async (showSuccessToast = false) => {
-    if (!monitorSession?.sessionId || captureLockRef.current) {
+  const handleMobileCaptureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      const snapshot = typeof reader.result === 'string' ? reader.result : '';
+
+      if (!snapshot) {
+        setLiveError('读取手机拍照画面失败，请重新拍摄。');
+        return;
+      }
+
+      stopStream();
+      setManualSnapshot(snapshot);
+      setPermissionState('granted');
+      setLiveError(null);
+      toast.success('已获取手机拍照画面', '可以保存快照或提交监控分析。');
+    };
+
+    reader.onerror = () => {
+      setLiveError('读取手机拍照画面失败，请重新拍摄。');
+      toast.error('拍照读取失败', '请重新拍摄或检查系统相册权限。');
+    };
+
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  };
+
+  const postFrameAnalysis = async (showSuccessToast = false, sessionIdOverride?: string) => {
+    const activeSessionId = sessionIdOverride ?? monitorSession?.sessionId;
+
+    if (!activeSessionId || captureLockRef.current) {
       return;
     }
 
@@ -274,7 +327,7 @@ const LiveView: React.FC<LiveViewProps> = ({
           Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
-          sessionId: monitorSession.sessionId,
+          sessionId: activeSessionId,
           image,
         }),
       });
@@ -311,7 +364,7 @@ const LiveView: React.FC<LiveViewProps> = ({
 
   const handleStartMonitoring = async () => {
     try {
-      if (!streamRef.current) {
+      if (!streamRef.current && !manualSnapshot) {
         await startPreview(selectedCameraId || undefined);
       }
 
@@ -353,7 +406,7 @@ const LiveView: React.FC<LiveViewProps> = ({
       setIsPaused(false);
       setLastCaptureAt(null);
       toast.success('监控已开始', `默认每 ${captureIntervalSeconds} 秒分析一次`);
-      await postFrameAnalysis();
+      await postFrameAnalysis(false, data.session.sessionId);
     } catch (error) {
       const message = isLikelyNetworkError(error)
         ? '无法连接到后端监控服务，请检查网络后重试。'
@@ -438,6 +491,16 @@ const LiveView: React.FC<LiveViewProps> = ({
     toast.success('快照已保存', '截图文件已交给浏览器下载');
   };
 
+  const handleRefreshCamera = async (cameraId = selectedCameraId) => {
+    try {
+      await startPreview(cameraId || undefined);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '摄像头启动失败';
+      setLiveError(message);
+      toast.error('摄像头启动失败', message);
+    }
+  };
+
   useEffect(() => {
     if (!isRunning || isPaused || !monitorSession?.sessionId) {
       return;
@@ -470,19 +533,43 @@ const LiveView: React.FC<LiveViewProps> = ({
           )}
 
           {!isCameraLoading && permissionState === 'denied' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-slate-300 gap-3 px-6">
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center text-slate-300 gap-3 px-6 pb-28">
               <AlertTriangle className="text-amber-400" size={32} />
               <p className="text-sm font-semibold">无法访问摄像头</p>
               <p className="text-xs text-slate-400 leading-relaxed">
-                请检查浏览器摄像头权限，或确认当前页面运行在允许访问摄像头的环境中。
+                请检查 Android 摄像头权限；如果当前 WebView 不支持实时预览，可以先使用手机拍照提交单帧分析。
               </p>
+              <button
+                type="button"
+                onClick={() => cameraCaptureInputRef.current?.click()}
+                className="inline-flex items-center gap-2 rounded-2xl bg-blue-500 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
+              >
+                <ImagePlus size={16} />
+                使用手机拍照
+              </button>
             </div>
           )}
 
-          <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
+          <video
+            ref={videoRef}
+            className={`w-full h-full object-cover ${manualSnapshot ? 'opacity-0' : ''}`}
+            muted
+            playsInline
+          />
+          {manualSnapshot ? (
+            <img src={manualSnapshot} alt="手机拍照画面" className="absolute inset-0 h-full w-full object-cover" />
+          ) : null}
           <canvas ref={canvasRef} className="hidden" />
+          <input
+            ref={cameraCaptureInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleMobileCaptureChange}
+          />
 
-          <div className="absolute top-4 left-4 flex items-center gap-2">
+          <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
             <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 ${
               isRunning && !isPaused ? 'bg-red-500 text-white' : 'bg-black/50 text-white'
             }`}>
@@ -494,7 +581,7 @@ const LiveView: React.FC<LiveViewProps> = ({
             </div>
           </div>
 
-          <div className="absolute bottom-4 left-4 right-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <div className="absolute bottom-4 left-4 right-4 z-20 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <button
               type="button"
               onClick={handleStartMonitoring}
@@ -546,11 +633,19 @@ const LiveView: React.FC<LiveViewProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => void startPreview(selectedCameraId || undefined)}
+              onClick={() => void handleRefreshCamera()}
               className="flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800"
             >
               <Webcam size={18} className="text-blue-500" />
               <span className="text-sm font-medium text-slate-700 dark:text-slate-200">刷新摄像头</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => cameraCaptureInputRef.current?.click()}
+              className="col-span-2 flex items-center justify-center gap-2 bg-blue-50 dark:bg-blue-950/30 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/40"
+            >
+              <ImagePlus size={18} className="text-blue-500" />
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-200">手机拍照兜底</span>
             </button>
           </div>
 
@@ -562,7 +657,7 @@ const LiveView: React.FC<LiveViewProps> = ({
                 onChange={(event) => {
                   const nextId = event.target.value;
                   setSelectedCameraId(nextId);
-                  void startPreview(nextId);
+                  void handleRefreshCamera(nextId);
                 }}
                 className="mt-2 w-full bg-transparent text-sm font-semibold text-slate-800 dark:text-slate-100 outline-none"
               >
