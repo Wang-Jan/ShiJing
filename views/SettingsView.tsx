@@ -582,7 +582,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </section>
 
       <div className="pb-10 text-center">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300">视净 Shi Jing v1.3.1</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300">视净 ShiJing v1.3.1</p>
       </div>
 
       <AnimatePresence>
